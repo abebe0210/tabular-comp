@@ -1,0 +1,14 @@
+[project]
+name = "tabular-comp"
+version = "0.1.0"
+description = "Autonomous tabular data competition framework"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.2.0",
+    "numpy>=1.26.0",
+    "scikit-learn>=1.5.0",
+    "lightgbm>=4.5.0",
+    "xgboost>=2.1.0",
+    "catboost>=1.2.0",
+    "optuna>=4.0.0",
+]
