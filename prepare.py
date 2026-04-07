@@ -18,7 +18,7 @@ from sklearn.metrics import roc_auc_score
 
 TARGET_COL = "target"           # target column name
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
-N_SPLITS = 5                    # number of CV folds
+N_SPLITS = 10                    # number of CV folds
 RANDOM_STATE = 42
 
 # ---------------------------------------------------------------------------
