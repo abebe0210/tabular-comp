@@ -226,7 +226,7 @@ def main():
     r_xgb = rankdata(oof_preds_xgb) / n
     r_cb = rankdata(oof_preds_cb) / n
     r_et = rankdata(oof_preds_et) / n
-    oof_preds = 0.3 * r_lgb + 0.25 * r_xgb + 0.25 * r_cb + 0.2 * r_et
+    oof_preds = (r_lgb + r_xgb + r_cb + r_et) / 4.0
 
     # Overall CV score
     overall_auc = evaluate(y, oof_preds)
