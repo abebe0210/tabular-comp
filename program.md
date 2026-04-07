@@ -44,9 +44,14 @@ uv run python experiment.py record-last --description "completed run description
 - `prepare.py` — 読み取り専用。評価関数・CV分割・データ読込が入っている。
 - パッケージの追加。`pyproject.toml` にあるものだけ使う。
 - 評価方法の変更。`evaluate()` 関数が真のメトリック。
-- 手動のハイパーパラメータチューニング。ハイパラ探索は別途 Optuna で行うため、`num_leaves`, `learning_rate`, `max_depth`, `reg_alpha`, `reg_lambda`, `subsample`, `colsample_*`, `iterations` などの値だけを小刻みに変える実験は禁止。必要な場合は Optuna 用の探索空間や目的関数の設計改善として扱い、単発の手調整はしない。
 
-**目標: val_auc を最大化する。** 自由に変更してよいのは特徴量、モデル構成、前処理、後処理、アンサンブル。ハイパーパラメータの単発手調整は Optuna に任せるため行わない。制約はコードがクラッシュしないこと。
+**非本質的試行は絶対禁止:**
+- CV数・CV分割方法・`prepare.py` の `N_SPLITS` / `RANDOM_STATE` / `get_cv_splits()` は変更しない。
+- seed変更は禁止。`train.py` 内の `SEED`, `SEEDS`, `random_state`, `random_seed` の値変更、seed追加、multi-seed化、seed平均・seed bagging は行わない。
+- ハイパーパラメータ値の手動変更は禁止。`num_leaves`, `learning_rate`, `max_depth`, `reg_alpha`, `reg_lambda`, `subsample`, `colsample_*`, `iterations`, `depth`, `l2_leaf_reg`, `min_child_*`, `n_estimators` などの値だけを変える実験は行わない。
+- Optuna試行は禁止。Optuna study/trial の追加・実行、探索空間や目的関数の追加、Optuna用ログや保存形式の実装もこの自律実験ループでは行わない。
+
+**目標: val_auc を最大化する。** 自由に変更してよいのは特徴量、前処理、後処理、モデル構成、アンサンブルなど、問題構造に関わる本質的な変更のみ。CV・seed・ハイパラ・Optunaに関する試行は禁止。
 
 **探索すべきアイデア（優先度順）:**
 1. 特徴量エンジニアリング: 交互作用特徴量、多項式特徴量、統計量（mean/std/min/max by group）、ビニング、ターゲットエンコーディング（リーク回避）
@@ -56,7 +61,6 @@ uv run python experiment.py record-last --description "completed run description
 5. 外れ値処理: クリッピング、除外
 6. アンサンブル: 複数モデルの加重平均、スタッキング
 7. 特徴量選択: importance-based, null importance, 相関フィルタ
-8. Optuna準備: ハイパラ値の手調整ではなく、必要なら Optuna の探索空間・目的関数・保存形式を改善する
 
 ## Output format
 

@@ -107,7 +107,7 @@ tabular-comp/
 | lightgbm | 勾配ブースティング（ベースライン） |
 | xgboost | 勾配ブースティング（代替） |
 | catboost | 勾配ブースティング（カテゴリカル特化） |
-| optuna | 別途行うハイパーパラメータ最適化 |
+| optuna | 人間または別ワークフロー用。自律実験ループでは試行しない |
 
 ## エージェントが探索する領域
 
@@ -120,7 +120,8 @@ tabular-comp/
 5. **外れ値処理** — クリッピング、除外
 6. **アンサンブル** — 加重平均、スタッキング
 7. **特徴量選択** — importance-based, null importance, 相関フィルタ
-8. **Optuna準備** — 手動の値調整ではなく、必要なら探索空間や目的関数を改善
+
+エージェントは CV数変更、seed変更、ハイパーパラメータ値の手動変更、Optuna study/trial の追加・実行を行わない。これらは非本質的試行として禁止し、必要な場合は人間または別ワークフローで扱う。
 
 ## 出力フォーマット
 
@@ -193,14 +194,6 @@ uv run python experiment.py run --description "description"
 
 ```python
 TARGET_COL = "your_target_column_name"
-```
-
-### CV分割数の変更
-
-`prepare.py` の `N_SPLITS` を変更:
-
-```python
-N_SPLITS = 10  # 10-fold CV
 ```
 
 ### 評価指標の変更（別のコンペ用）
