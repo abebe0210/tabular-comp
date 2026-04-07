@@ -1,6 +1,8 @@
 data/
 results.tsv
 run.log
+.experiment_state.json
+catboost_info/
 __pycache__/
 *.pyc
 .venv/

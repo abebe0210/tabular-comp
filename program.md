@@ -14,13 +14,28 @@
    - `train.py` — あなたが編集するファイル。特徴量、モデル、ハイパーパラメータ。
 5. **データ確認**: `data/train.csv` が存在することを確認。なければユーザーに配置を依頼。
 6. **results.tsv 初期化**: ヘッダー行だけの `results.tsv` を作成（`.gitignore` 管理下のため git には入らない）。
-7. **確認して開始**: セットアップ完了を確認。
+7. **再開状態確認**: `uv run python experiment.py status` を実行し、既存の `exp/<tag>` ブランチや未記録の `run.log` がないか確認。
+8. **確認して開始**: セットアップ完了を確認。
 
 確認が取れたら、実験ループを開始。
 
 ## Experimentation
 
-実験は `uv run train.py` で実行する。
+実験は `experiment.py` 経由で実行する。
+
+```
+uv run python experiment.py run --description "short experiment description"
+```
+
+補助コマンド:
+
+```
+uv run python experiment.py status
+uv run python experiment.py resume --branch exp/<tag>
+uv run python experiment.py record-last --description "completed run description"
+```
+
+`experiment.py` は `run.log` の生成、`val_auc` / `elapsed_seconds` の解析、`results.tsv` への追記、改善/悪化判定、悪化時の安全な `git reset --hard HEAD~1` を担当する。セッションが途中で切れた場合は、まず `status` を実行して推奨アクションに従う。
 
 **変更できること:**
 - `train.py` のみ。特徴量エンジニアリング、モデル選択、ハイパーパラメータ、アンサンブル、前処理、後処理 — 全て自由。
@@ -64,7 +79,7 @@ grep "^val_auc:" run.log
 
 ## Logging results
 
-実験完了時に `results.tsv`（タブ区切り）に記録する。
+実験完了時に `experiment.py` が `results.tsv`（タブ区切り）に記録する。
 
 ヘッダーと5列:
 
@@ -94,19 +109,20 @@ d4e5f6g	0.000000	0.0	crash	target encoding bug
 
 LOOP FOREVER:
 
-1. 現在の git 状態を確認
+1. `uv run python experiment.py status` で現在の git 状態、ベストスコア、未記録ログを確認
 2. 実験のアイデアを考え、`train.py` を編集
-3. `git commit`
-4. 実験実行: `uv run train.py > run.log 2>&1`
-5. 結果を確認: `grep "^val_auc:" run.log`
-6. grep出力が空ならクラッシュ。`tail -n 50 run.log` でエラーを確認して修正を試みる。数回試してダメなら諦める
-7. `results.tsv` に記録（NOTE: results.tsv は git 管理外にする）
-8. val_auc が改善（高くなった）→ ブランチを進める（keep）
-9. val_auc が同等以下 → `git reset --hard HEAD~1` で直前のコミットを取り消す（discard）
+3. `git add train.py && git commit -m "expN: description"`
+4. 実験実行と記録: `uv run python experiment.py run --description "description"`
+5. `experiment.py` が `run.log` を解析し、`results.tsv` に記録する
+6. val_auc が改善（高くなった）→ `keep` としてブランチを進める
+7. val_auc が同等以下またはクラッシュ → `discard` / `crash` として記録後、安全条件を満たす場合だけ直前の実験コミットを `git reset --hard HEAD~1` で取り消す
+8. 次の実験へ
 
 **タイムアウト**: 各実験は通常数分以内。10分を超えたら kill して failure 扱い。
 
 **クラッシュ**: タイポやインポート忘れなら修正して再実行。アイデア自体が破綻していたらスキップして次へ。
+
+**再開**: セッションが中断したら、同じディレクトリで `uv run python experiment.py status` を実行する。`main` に戻っていて既存の `exp/<tag>` ブランチがある場合は `uv run python experiment.py resume --branch exp/<tag>` を実行する。`run.log` に完了済み結果があり、現在の `HEAD` が `results.tsv` に未記録なら `record-last` を使う。`run.log` が空または解析不能なら `run --description "..."` で現在のコミットを再実行する。
 
 **絶対に止まるな**: 実験ループ開始後、人間に「続けますか？」と聞くな。人間は寝ているかもしれない。アイデアが尽きたら、もっと考えろ — 過去のニアミスの組み合わせ、より大胆なアーキテクチャ変更、別の前処理戦略を試せ。人間が手動で止めるまでループし続けろ。
 
