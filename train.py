@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import lightgbm as lgb
 import xgboost as xgb
+from catboost import CatBoostClassifier
 from sklearn.preprocessing import LabelEncoder
 
 from prepare import load_data, get_cv_splits, evaluate
@@ -110,6 +111,17 @@ XGB_PARAMS = {
     "tree_method": "hist",
 }
 
+CB_PARAMS = {
+    "iterations": 2000,
+    "learning_rate": 0.02,
+    "depth": 6,
+    "loss_function": "Logloss",
+    "eval_metric": "AUC",
+    "random_seed": 42,
+    "verbose": 0,
+    "early_stopping_rounds": 50,
+}
+
 # ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
@@ -128,6 +140,7 @@ def main():
     splits = get_cv_splits(y)
     oof_preds_lgb = np.zeros(len(y))
     oof_preds_xgb = np.zeros(len(y))
+    oof_preds_cb = np.zeros(len(y))
     fold_scores = []
 
     for fold_idx, (train_idx, val_idx) in enumerate(splits):
@@ -155,13 +168,22 @@ def main():
         xgb_preds = xgb_model.predict_proba(X_val)[:, 1]
         oof_preds_xgb[val_idx] = xgb_preds
 
-        # Blend
-        val_preds = 0.5 * lgb_preds + 0.5 * xgb_preds
+        # CatBoost
+        cb_model = CatBoostClassifier(**CB_PARAMS)
+        cb_model.fit(
+            X_train, y_train,
+            eval_set=(X_val, y_val),
+        )
+        cb_preds = cb_model.predict_proba(X_val)[:, 1]
+        oof_preds_cb[val_idx] = cb_preds
+
+        # Blend (equal weights)
+        val_preds = (lgb_preds + xgb_preds + cb_preds) / 3.0
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
         print(f"Fold {fold_idx}: AUC = {fold_auc:.6f}")
 
-    oof_preds = 0.5 * oof_preds_lgb + 0.5 * oof_preds_xgb
+    oof_preds = (oof_preds_lgb + oof_preds_xgb + oof_preds_cb) / 3.0
 
     # Overall CV score
     overall_auc = evaluate(y, oof_preds)
