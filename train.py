@@ -60,6 +60,12 @@ def create_features(df, feature_cols):
     X["age_x_income"] = X["age"] * X["annual_income"]
     X["spend_x_visits"] = X["total_spend"] * X["monthly_web_visits"]
     X["recency_x_spend"] = X["days_since_last_purchase"] * X["total_spend"]
+    # Additional interactions
+    X["age_x_spend"] = X["age"] * X["total_spend"]
+    X["income_x_purchases"] = X["annual_income"] * X["total_purchases"]
+    X["recency_x_web"] = X["days_since_last_purchase"] * X["web_purchases"]
+    X["spend_per_visit"] = X["total_spend"] / (X["monthly_web_visits"] + 1)
+    X["purchase_rate"] = X["total_purchases"] / (X["days_since_last_purchase"] + 1)
 
     # Label encode all remaining object/string columns
     for col in X.columns:
