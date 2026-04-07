@@ -10,6 +10,7 @@ import time
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
+from sklearn.preprocessing import LabelEncoder
 
 from prepare import load_data, get_cv_splits, evaluate
 
@@ -20,6 +21,25 @@ from prepare import load_data, get_cv_splits, evaluate
 def create_features(df, feature_cols):
     """Create features from raw data. Returns (X, feature_names)."""
     X = df[feature_cols].copy()
+
+    # Parse registration_date and extract date features
+    X["registration_date"] = pd.to_datetime(X["registration_date"], errors="coerce")
+    X["reg_year"] = X["registration_date"].dt.year
+    X["reg_month"] = X["registration_date"].dt.month
+    X["reg_dayofweek"] = X["registration_date"].dt.dayofweek
+    X = X.drop(columns=["registration_date"])
+
+    # Label encode categorical string columns
+    for col in ["education_level", "marital_status"]:
+        if col in X.columns and X[col].dtype == object:
+            le = LabelEncoder()
+            X[col] = le.fit_transform(X[col].astype(str))
+
+    # Drop id-like columns
+    for col in ["customer_id"]:
+        if col in X.columns:
+            X = X.drop(columns=[col])
+
     feature_names = list(X.columns)
     return X, feature_names
 
