@@ -10,6 +10,7 @@ import time
 import numpy as np
 import pandas as pd
 import lightgbm as lgb
+import xgboost as xgb
 from sklearn.preprocessing import LabelEncoder
 
 from prepare import load_data, get_cv_splits, evaluate
@@ -93,6 +94,22 @@ LGB_PARAMS = {
     "random_state": 42,
 }
 
+XGB_PARAMS = {
+    "objective": "binary:logistic",
+    "eval_metric": "auc",
+    "verbosity": 0,
+    "n_estimators": 2000,
+    "learning_rate": 0.02,
+    "max_depth": 6,
+    "min_child_weight": 5,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "reg_alpha": 0.1,
+    "reg_lambda": 1.0,
+    "random_state": 42,
+    "tree_method": "hist",
+}
+
 # ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
@@ -109,25 +126,42 @@ def main():
 
     # Cross-validation
     splits = get_cv_splits(y)
-    oof_preds = np.zeros(len(y))
+    oof_preds_lgb = np.zeros(len(y))
+    oof_preds_xgb = np.zeros(len(y))
     fold_scores = []
 
     for fold_idx, (train_idx, val_idx) in enumerate(splits):
         X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        model = lgb.LGBMClassifier(**LGB_PARAMS)
-        model.fit(
+        # LightGBM
+        lgb_model = lgb.LGBMClassifier(**LGB_PARAMS)
+        lgb_model.fit(
             X_train, y_train,
             eval_set=[(X_val, y_val)],
             callbacks=[lgb.early_stopping(50, verbose=False)],
         )
+        lgb_preds = lgb_model.predict_proba(X_val)[:, 1]
+        oof_preds_lgb[val_idx] = lgb_preds
 
-        val_preds = model.predict_proba(X_val)[:, 1]
-        oof_preds[val_idx] = val_preds
+        # XGBoost
+        xgb_model = xgb.XGBClassifier(**XGB_PARAMS)
+        xgb_model.fit(
+            X_train, y_train,
+            eval_set=[(X_val, y_val)],
+            verbose=False,
+            early_stopping_rounds=50,
+        )
+        xgb_preds = xgb_model.predict_proba(X_val)[:, 1]
+        oof_preds_xgb[val_idx] = xgb_preds
+
+        # Blend
+        val_preds = 0.5 * lgb_preds + 0.5 * xgb_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
         print(f"Fold {fold_idx}: AUC = {fold_auc:.6f}")
+
+    oof_preds = 0.5 * oof_preds_lgb + 0.5 * oof_preds_xgb
 
     # Overall CV score
     overall_auc = evaluate(y, oof_preds)
