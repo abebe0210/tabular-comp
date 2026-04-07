@@ -124,9 +124,9 @@ CB_PARAMS = {
 }
 
 ET_PARAMS = {
-    "n_estimators": 500,
-    "max_depth": None,
-    "min_samples_leaf": 5,
+    "n_estimators": 1000,
+    "max_depth": 20,
+    "min_samples_leaf": 3,
     "max_features": "sqrt",
     "random_state": 42,
     "n_jobs": -1,
