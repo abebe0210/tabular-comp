@@ -117,10 +117,12 @@ XGB_PARAMS = {
 CB_PARAMS = {
     "iterations": 2000,
     "learning_rate": 0.02,
-    "depth": 6,
+    "depth": 7,
+    "l2_leaf_reg": 5,
+    "min_data_in_leaf": 10,
     "loss_function": "Logloss",
     "eval_metric": "AUC",
-    "random_seed": 42,
+    "random_seed": 123,
     "verbose": 0,
     "early_stopping_rounds": 50,
 }
