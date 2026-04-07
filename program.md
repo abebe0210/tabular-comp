@@ -11,7 +11,7 @@
 3. **依存パッケージインストール**: `uv sync` を実行して `.venv` と全依存パッケージを準備。
 4. **ファイルを読む**: リポジトリは小さい。以下を全て読んで文脈を把握:
    - `prepare.py` — 固定の評価関数、データ読込、CV分割。変更不可。
-   - `train.py` — あなたが編集するファイル。特徴量、モデル、ハイパーパラメータ。
+   - `train.py` — あなたが編集するファイル。特徴量、モデル、アンサンブル、前処理。
 5. **データ確認**: `data/train.csv` が存在することを確認。なければユーザーに配置を依頼。
 6. **results.tsv 初期化**: ヘッダー行だけの `results.tsv` を作成（`.gitignore` 管理下のため git には入らない）。
 7. **再開状態確認**: `uv run python experiment.py status` を実行し、既存の `exp/<tag>` ブランチや未記録の `run.log` がないか確認。
@@ -38,24 +38,25 @@ uv run python experiment.py record-last --description "completed run description
 `experiment.py` は `run.log` の生成、`val_auc` / `elapsed_seconds` の解析、`results.tsv` への追記、改善/悪化判定、悪化時の安全な `git reset --hard HEAD~1` を担当する。セッションが途中で切れた場合は、まず `status` を実行して推奨アクションに従う。
 
 **変更できること:**
-- `train.py` のみ。特徴量エンジニアリング、モデル選択、ハイパーパラメータ、アンサンブル、前処理、後処理 — 全て自由。
+- `train.py` のみ。特徴量エンジニアリング、モデル選択、アンサンブル、前処理、後処理 — 全て自由。
 
 **変更できないこと:**
 - `prepare.py` — 読み取り専用。評価関数・CV分割・データ読込が入っている。
 - パッケージの追加。`pyproject.toml` にあるものだけ使う。
 - 評価方法の変更。`evaluate()` 関数が真のメトリック。
+- 手動のハイパーパラメータチューニング。ハイパラ探索は別途 Optuna で行うため、`num_leaves`, `learning_rate`, `max_depth`, `reg_alpha`, `reg_lambda`, `subsample`, `colsample_*`, `iterations` などの値だけを小刻みに変える実験は禁止。必要な場合は Optuna 用の探索空間や目的関数の設計改善として扱い、単発の手調整はしない。
 
-**目標: val_auc を最大化する。** 全てが自由: 特徴量、モデル、ハイパーパラメータ、アンサンブル。制約はコードがクラッシュしないことだけ。
+**目標: val_auc を最大化する。** 自由に変更してよいのは特徴量、モデル構成、前処理、後処理、アンサンブル。ハイパーパラメータの単発手調整は Optuna に任せるため行わない。制約はコードがクラッシュしないこと。
 
 **探索すべきアイデア（優先度順）:**
 1. 特徴量エンジニアリング: 交互作用特徴量、多項式特徴量、統計量（mean/std/min/max by group）、ビニング、ターゲットエンコーディング（リーク回避）
 2. 欠損値処理: 異なるimputation戦略、欠損フラグ特徴量
 3. モデル変更: LightGBM → XGBoost → CatBoost → スタッキング/ブレンディング
-4. ハイパーパラメータチューニング: num_leaves, learning_rate, max_depth, reg_alpha/lambda, subsample
-5. カテゴリカル変数処理: label encoding, target encoding, frequency encoding
-6. 外れ値処理: クリッピング、除外
-7. アンサンブル: 複数モデルの加重平均、スタッキング
-8. 特徴量選択: importance-based, null importance, 相関フィルタ
+4. カテゴリカル変数処理: label encoding, target encoding, frequency encoding
+5. 外れ値処理: クリッピング、除外
+6. アンサンブル: 複数モデルの加重平均、スタッキング
+7. 特徴量選択: importance-based, null importance, 相関フィルタ
+8. Optuna準備: ハイパラ値の手調整ではなく、必要なら Optuna の探索空間・目的関数・保存形式を改善する
 
 ## Output format
 
@@ -105,7 +106,7 @@ d4e5f6g	0.000000	0.0	crash	target encoding bug
 
 ## The experiment loop
 
-実験は専用ブランチ（例: `exp/apr7`）で行う。
+実験は専用ブランチ（`exp/<tag>`）で行う。
 
 LOOP FOREVER:
 

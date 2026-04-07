@@ -351,6 +351,15 @@ def status_lines() -> list[str]:
         lines.append(f"best_keep: {best.commit} val_auc={best.val_auc:.6f} desc={best.description}")
     else:
         lines.append("best_keep: (none)")
+    if rows:
+        lines.append("recent_results:")
+        for row in rows[-5:]:
+            lines.append(
+                f"  {row.commit} {row.status} val_auc={row.val_auc:.6f} "
+                f"elapsed={row.elapsed_sec:.1f}s desc={row.description}"
+            )
+    else:
+        lines.append("recent_results: (none)")
     if metrics:
         val = f"{metrics.val_auc:.6f}" if metrics.val_auc is not None else "(missing)"
         elapsed = f"{metrics.elapsed_sec:.1f}s" if metrics.elapsed_sec is not None else "(missing)"
@@ -407,7 +416,7 @@ def build_parser() -> argparse.ArgumentParser:
     record_parser.add_argument("--description", required=True, help="Short experiment description.")
 
     resume_parser = subparsers.add_parser("resume", help="Checkout an experiment branch safely.")
-    resume_parser.add_argument("--branch", required=True, help="Existing experiment branch, e.g. exp/apr7.")
+    resume_parser.add_argument("--branch", required=True, help="Existing experiment branch, e.g. exp/<tag>.")
 
     return parser
 
