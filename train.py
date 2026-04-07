@@ -29,9 +29,9 @@ def create_features(df, feature_cols):
     X["reg_dayofweek"] = X["registration_date"].dt.dayofweek
     X = X.drop(columns=["registration_date"])
 
-    # Label encode categorical string columns
-    for col in ["education_level", "marital_status"]:
-        if col in X.columns and X[col].dtype == object:
+    # Label encode all remaining object/string columns
+    for col in X.columns:
+        if X[col].dtype == object:
             le = LabelEncoder()
             X[col] = le.fit_transform(X[col].astype(str))
 
