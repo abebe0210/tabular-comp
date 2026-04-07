@@ -145,12 +145,12 @@ def main():
         oof_preds_lgb[val_idx] = lgb_preds
 
         # XGBoost
-        xgb_model = xgb.XGBClassifier(**XGB_PARAMS)
+        xgb_params = {**XGB_PARAMS, "early_stopping_rounds": 50}
+        xgb_model = xgb.XGBClassifier(**xgb_params)
         xgb_model.fit(
             X_train, y_train,
             eval_set=[(X_val, y_val)],
             verbose=False,
-            early_stopping_rounds=50,
         )
         xgb_preds = xgb_model.predict_proba(X_val)[:, 1]
         oof_preds_xgb[val_idx] = xgb_preds
