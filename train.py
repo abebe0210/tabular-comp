@@ -219,7 +219,14 @@ def main():
 
     oof_preds_lgb = np.mean(oof_preds_lgb_list, axis=0)
     oof_preds_xgb = np.mean(oof_preds_xgb_list, axis=0)
-    oof_preds = 0.3 * oof_preds_lgb + 0.25 * oof_preds_xgb + 0.25 * oof_preds_cb + 0.2 * oof_preds_et
+    # Rank-based aggregation: convert to ranks then blend
+    from scipy.stats import rankdata
+    n = len(y)
+    r_lgb = rankdata(oof_preds_lgb) / n
+    r_xgb = rankdata(oof_preds_xgb) / n
+    r_cb = rankdata(oof_preds_cb) / n
+    r_et = rankdata(oof_preds_et) / n
+    oof_preds = 0.3 * r_lgb + 0.25 * r_xgb + 0.25 * r_cb + 0.2 * r_et
 
     # Overall CV score
     overall_auc = evaluate(y, oof_preds)
