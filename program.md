@@ -11,7 +11,7 @@
 3. **依存パッケージインストール**: `uv sync` を実行して `.venv` と全依存パッケージを準備。
 4. **ファイルを読む**: リポジトリは小さい。以下を全て読んで文脈を把握:
    - `prepare.py` — 固定の評価関数、データ読込、CV分割。変更不可。
-   - `train.py` — あなたが編集するファイル。特徴量、モデル、ハイパーパラメータ。
+   - `train.py` — あなたが編集するファイル。特徴量、モデル、アンサンブル、前処理。
 5. **データ確認**: `data/train.csv` が存在することを確認。なければユーザーに配置を依頼。
 6. **results.tsv 初期化**: ヘッダー行だけの `results.tsv` を作成（`.gitignore` 管理下のため git には入らない）。
 7. **確認して開始**: セットアップ完了を確認。
@@ -23,24 +23,29 @@
 実験は `uv run train.py` で実行する。
 
 **変更できること:**
-- `train.py` のみ。特徴量エンジニアリング、モデル選択、ハイパーパラメータ、アンサンブル、前処理、後処理 — 全て自由。
+- `train.py` のみ。特徴量エンジニアリング、モデル選択、アンサンブル、前処理、後処理 — 全て自由。
 
 **変更できないこと:**
 - `prepare.py` — 読み取り専用。評価関数・CV分割・データ読込が入っている。
 - パッケージの追加。`pyproject.toml` にあるものだけ使う。
 - 評価方法の変更。`evaluate()` 関数が真のメトリック。
 
-**目標: val_auc を最大化する。** 全てが自由: 特徴量、モデル、ハイパーパラメータ、アンサンブル。制約はコードがクラッシュしないことだけ。
+**非本質的試行は絶対禁止:**
+- CV数・CV分割方法・`prepare.py` の `N_SPLITS` / `RANDOM_STATE` / `get_cv_splits()` は変更しない。
+- seed変更は禁止。`train.py` 内の `SEED`, `SEEDS`, `random_state`, `random_seed` の値変更、seed追加、multi-seed化、seed平均・seed bagging は行わない。
+- ハイパーパラメータ値の手動変更は禁止。`num_leaves`, `learning_rate`, `max_depth`, `reg_alpha`, `reg_lambda`, `subsample`, `colsample_*`, `iterations`, `depth`, `l2_leaf_reg`, `min_child_*`, `n_estimators` などの値だけを変える実験は行わない。
+- Optuna試行は禁止。Optuna study/trial の追加・実行、探索空間や目的関数の追加、Optuna用ログや保存形式の実装もこの自律実験ループでは行わない。
+
+**目標: val_auc を最大化する。** 自由に変更してよいのは特徴量、前処理、後処理、モデル構成、アンサンブルなど、問題構造に関わる本質的な変更のみ。CV・seed・ハイパラ・Optunaに関する試行は禁止。
 
 **探索すべきアイデア（優先度順）:**
 1. 特徴量エンジニアリング: 交互作用特徴量、多項式特徴量、統計量（mean/std/min/max by group）、ビニング、ターゲットエンコーディング（リーク回避）
 2. 欠損値処理: 異なるimputation戦略、欠損フラグ特徴量
 3. モデル変更: LightGBM → XGBoost → CatBoost → スタッキング/ブレンディング
-4. ハイパーパラメータチューニング: num_leaves, learning_rate, max_depth, reg_alpha/lambda, subsample
-5. カテゴリカル変数処理: label encoding, target encoding, frequency encoding
-6. 外れ値処理: クリッピング、除外
-7. アンサンブル: 複数モデルの加重平均、スタッキング
-8. 特徴量選択: importance-based, null importance, 相関フィルタ
+4. カテゴリカル変数処理: label encoding, target encoding, frequency encoding
+5. 外れ値処理: クリッピング、除外
+6. アンサンブル: 複数モデルの加重平均、スタッキング
+7. 特徴量選択: importance-based, null importance, 相関フィルタ
 
 ## Output format
 

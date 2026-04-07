@@ -9,7 +9,7 @@
 リポジトリは意図的に小さく保たれており、重要なファイルは3つだけ:
 
 - **`prepare.py`** — 固定の評価フレームワーク。データ読込、CV分割（StratifiedKFold）、ROC-AUC評価関数。**変更不可**。
-- **`train.py`** — エージェントが編集する唯一のファイル。特徴量エンジニアリング、モデル定義、ハイパーパラメータ、アンサンブル — 全てが変更対象。**エージェントが編集**。
+- **`train.py`** — エージェントが編集する唯一のファイル。特徴量エンジニアリング、モデル定義、アンサンブル、前処理 — 全てが変更対象。**エージェントが編集**。
 - **`program.md`** — エージェントへの指示書。自律実験ループの定義。**人間が編集**。
 
 評価指標は **ROC-AUC**（高いほど良い）。CVはStratifiedKFold 10分割で固定されているため、実験間の比較が公平に行える。
@@ -105,7 +105,7 @@ tabular-comp/
 | lightgbm | 勾配ブースティング（ベースライン） |
 | xgboost | 勾配ブースティング（代替） |
 | catboost | 勾配ブースティング（カテゴリカル特化） |
-| optuna | ハイパーパラメータ最適化 |
+| optuna | 人間または別ワークフロー用。自律実験ループでは試行しない |
 
 ## エージェントが探索する領域
 
@@ -114,11 +114,12 @@ tabular-comp/
 1. **特徴量エンジニアリング** — 交互作用、多項式、統計量集約、ビニング、ターゲットエンコーディング
 2. **欠損値処理** — imputation戦略、欠損フラグ特徴量
 3. **モデル変更** — LightGBM / XGBoost / CatBoost / スタッキング / ブレンディング
-4. **ハイパーパラメータ** — num_leaves, learning_rate, max_depth, regularization
-5. **カテゴリカル変数** — label / target / frequency encoding
-6. **外れ値処理** — クリッピング、除外
-7. **アンサンブル** — 加重平均、スタッキング
-8. **特徴量選択** — importance-based, null importance, 相関フィルタ
+4. **カテゴリカル変数** — label / target / frequency encoding
+5. **外れ値処理** — クリッピング、除外
+6. **アンサンブル** — 加重平均、スタッキング
+7. **特徴量選択** — importance-based, null importance, 相関フィルタ
+
+エージェントは CV数変更、seed変更、ハイパーパラメータ値の手動変更、Optuna study/trial の追加・実行を行わない。これらは非本質的試行として禁止し、必要な場合は人間または別ワークフローで扱う。
 
 ## 出力フォーマット
 
@@ -159,14 +160,6 @@ d4e5f6g	0.000000	0.0	crash	target encoding bug
 
 ```python
 TARGET_COL = "your_target_column_name"
-```
-
-### CV分割数の変更
-
-`prepare.py` の `N_SPLITS` を変更:
-
-```python
-N_SPLITS = 10  # 10-fold CV
 ```
 
 ### 評価指標の変更（別のコンペ用）
