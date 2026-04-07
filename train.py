@@ -31,7 +31,7 @@ def create_features(df, feature_cols):
 
     # Label encode all remaining object/string columns
     for col in X.columns:
-        if X[col].dtype == object:
+        if X[col].dtype == object or str(X[col].dtype) == "str":
             le = LabelEncoder()
             X[col] = le.fit_transform(X[col].astype(str))
 
