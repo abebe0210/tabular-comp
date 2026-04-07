@@ -83,8 +83,9 @@ LGB_PARAMS = {
     "objective": "binary",
     "metric": "auc",
     "verbosity": -1,
-    "n_estimators": 2000,
-    "learning_rate": 0.02,
+    "boosting_type": "dart",
+    "n_estimators": 1000,
+    "learning_rate": 0.05,
     "num_leaves": 63,
     "max_depth": 7,
     "min_child_samples": 15,
@@ -93,6 +94,8 @@ LGB_PARAMS = {
     "colsample_bytree": 0.8,
     "reg_alpha": 0.1,
     "reg_lambda": 1.0,
+    "drop_rate": 0.1,
+    "skip_drop": 0.5,
     "random_state": 42,
 }
 
@@ -163,7 +166,7 @@ def main():
         X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        # LightGBM multi-seed
+        # LightGBM multi-seed (DART: no early stopping)
         lgb_fold_preds = []
         for i, seed in enumerate(SEEDS):
             params = {**LGB_PARAMS, "random_state": seed}
@@ -171,7 +174,6 @@ def main():
             lgb_model.fit(
                 X_train, y_train,
                 eval_set=[(X_val, y_val)],
-                callbacks=[lgb.early_stopping(50, verbose=False)],
             )
             preds = lgb_model.predict_proba(X_val)[:, 1]
             oof_preds_lgb_list[i][val_idx] = preds
