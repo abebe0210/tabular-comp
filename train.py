@@ -12,7 +12,8 @@ import pandas as pd
 import lightgbm as lgb
 import xgboost as xgb
 from catboost import CatBoostClassifier
-from sklearn.preprocessing import LabelEncoder
+from sklearn.preprocessing import LabelEncoder, RobustScaler
+from sklearn.ensemble import ExtraTreesClassifier
 
 from prepare import load_data, get_cv_splits, evaluate
 
@@ -122,6 +123,15 @@ CB_PARAMS = {
     "early_stopping_rounds": 50,
 }
 
+ET_PARAMS = {
+    "n_estimators": 500,
+    "max_depth": None,
+    "min_samples_leaf": 5,
+    "max_features": "sqrt",
+    "random_state": 42,
+    "n_jobs": -1,
+}
+
 # ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
@@ -141,6 +151,7 @@ def main():
     oof_preds_lgb = np.zeros(len(y))
     oof_preds_xgb = np.zeros(len(y))
     oof_preds_cb = np.zeros(len(y))
+    oof_preds_et = np.zeros(len(y))
     fold_scores = []
 
     for fold_idx, (train_idx, val_idx) in enumerate(splits):
@@ -177,13 +188,22 @@ def main():
         cb_preds = cb_model.predict_proba(X_val)[:, 1]
         oof_preds_cb[val_idx] = cb_preds
 
-        # Blend (equal weights)
-        val_preds = (lgb_preds + xgb_preds + cb_preds) / 3.0
+        # ExtraTrees
+        scaler = RobustScaler()
+        X_train_sc = scaler.fit_transform(X_train)
+        X_val_sc = scaler.transform(X_val)
+        et_model = ExtraTreesClassifier(**ET_PARAMS)
+        et_model.fit(X_train_sc, y_train)
+        et_preds = et_model.predict_proba(X_val_sc)[:, 1]
+        oof_preds_et[val_idx] = et_preds
+
+        # Blend (LGB+XGB+CB+ET with 0.3/0.25/0.25/0.2)
+        val_preds = 0.3 * lgb_preds + 0.25 * xgb_preds + 0.25 * cb_preds + 0.2 * et_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
         print(f"Fold {fold_idx}: AUC = {fold_auc:.6f}")
 
-    oof_preds = (oof_preds_lgb + oof_preds_xgb + oof_preds_cb) / 3.0
+    oof_preds = 0.3 * oof_preds_lgb + 0.25 * oof_preds_xgb + 0.25 * oof_preds_cb + 0.2 * oof_preds_et
 
     # Overall CV score
     overall_auc = evaluate(y, oof_preds)
