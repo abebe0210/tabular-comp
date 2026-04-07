@@ -29,6 +29,35 @@ def create_features(df, feature_cols):
     X["reg_dayofweek"] = X["registration_date"].dt.dayofweek
     X = X.drop(columns=["registration_date"])
 
+    # Age feature
+    X["age"] = 2026 - X["birth_year"]
+
+    # Total spend and spend ratios
+    spend_cols = ["spend_wines", "spend_fruits", "spend_meat", "spend_fish", "spend_sweets", "spend_gold"]
+    X["total_spend"] = X[spend_cols].sum(axis=1)
+    X["spend_wines_ratio"] = X["spend_wines"] / (X["total_spend"] + 1)
+    X["spend_meat_ratio"] = X["spend_meat"] / (X["total_spend"] + 1)
+    X["spend_gold_ratio"] = X["spend_gold"] / (X["total_spend"] + 1)
+
+    # Total purchases
+    purchase_cols = ["deals_purchases", "web_purchases", "catalog_purchases", "store_purchases"]
+    X["total_purchases"] = X[purchase_cols].sum(axis=1)
+    X["deals_ratio"] = X["deals_purchases"] / (X["total_purchases"] + 1)
+    X["web_ratio"] = X["web_purchases"] / (X["total_purchases"] + 1)
+    X["catalog_ratio"] = X["catalog_purchases"] / (X["total_purchases"] + 1)
+
+    # Spend per purchase
+    X["spend_per_purchase"] = X["total_spend"] / (X["total_purchases"] + 1)
+
+    # Income per person in household
+    X["num_family"] = X["num_children"] + X["num_teenagers"] + 1
+    X["income_per_person"] = X["annual_income"] / (X["num_family"] + 1)
+
+    # Interaction features
+    X["age_x_income"] = X["age"] * X["annual_income"]
+    X["spend_x_visits"] = X["total_spend"] * X["monthly_web_visits"]
+    X["recency_x_spend"] = X["days_since_last_purchase"] * X["total_spend"]
+
     # Label encode all remaining object/string columns
     for col in X.columns:
         if X[col].dtype == object or str(X[col].dtype) == "str":
