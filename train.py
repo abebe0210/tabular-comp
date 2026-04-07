@@ -152,8 +152,9 @@ def main():
 
     # Cross-validation
     splits = get_cv_splits(y)
-    oof_preds_lgb = np.zeros(len(y))
-    oof_preds_xgb = np.zeros(len(y))
+    SEEDS = [42, 123, 777]
+    oof_preds_lgb_list = [np.zeros(len(y)) for _ in SEEDS]
+    oof_preds_xgb_list = [np.zeros(len(y)) for _ in SEEDS]
     oof_preds_cb = np.zeros(len(y))
     oof_preds_et = np.zeros(len(y))
     fold_scores = []
@@ -162,26 +163,35 @@ def main():
         X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        # LightGBM
-        lgb_model = lgb.LGBMClassifier(**LGB_PARAMS)
-        lgb_model.fit(
-            X_train, y_train,
-            eval_set=[(X_val, y_val)],
-            callbacks=[lgb.early_stopping(50, verbose=False)],
-        )
-        lgb_preds = lgb_model.predict_proba(X_val)[:, 1]
-        oof_preds_lgb[val_idx] = lgb_preds
+        # LightGBM multi-seed
+        lgb_fold_preds = []
+        for i, seed in enumerate(SEEDS):
+            params = {**LGB_PARAMS, "random_state": seed}
+            lgb_model = lgb.LGBMClassifier(**params)
+            lgb_model.fit(
+                X_train, y_train,
+                eval_set=[(X_val, y_val)],
+                callbacks=[lgb.early_stopping(50, verbose=False)],
+            )
+            preds = lgb_model.predict_proba(X_val)[:, 1]
+            oof_preds_lgb_list[i][val_idx] = preds
+            lgb_fold_preds.append(preds)
+        lgb_preds = np.mean(lgb_fold_preds, axis=0)
 
-        # XGBoost
-        xgb_params = {**XGB_PARAMS, "early_stopping_rounds": 50}
-        xgb_model = xgb.XGBClassifier(**xgb_params)
-        xgb_model.fit(
-            X_train, y_train,
-            eval_set=[(X_val, y_val)],
-            verbose=False,
-        )
-        xgb_preds = xgb_model.predict_proba(X_val)[:, 1]
-        oof_preds_xgb[val_idx] = xgb_preds
+        # XGBoost multi-seed
+        xgb_fold_preds = []
+        for i, seed in enumerate(SEEDS):
+            params = {**XGB_PARAMS, "random_state": seed, "early_stopping_rounds": 50}
+            xgb_model = xgb.XGBClassifier(**params)
+            xgb_model.fit(
+                X_train, y_train,
+                eval_set=[(X_val, y_val)],
+                verbose=False,
+            )
+            preds = xgb_model.predict_proba(X_val)[:, 1]
+            oof_preds_xgb_list[i][val_idx] = preds
+            xgb_fold_preds.append(preds)
+        xgb_preds = np.mean(xgb_fold_preds, axis=0)
 
         # CatBoost
         cb_model = CatBoostClassifier(**CB_PARAMS)
@@ -201,12 +211,14 @@ def main():
         et_preds = et_model.predict_proba(X_val_sc)[:, 1]
         oof_preds_et[val_idx] = et_preds
 
-        # Blend (LGB+XGB+CB+ET with 0.3/0.25/0.25/0.2)
+        # Blend (multi-seed LGB + multi-seed XGB + CB + ET)
         val_preds = 0.3 * lgb_preds + 0.25 * xgb_preds + 0.25 * cb_preds + 0.2 * et_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
         print(f"Fold {fold_idx}: AUC = {fold_auc:.6f}")
 
+    oof_preds_lgb = np.mean(oof_preds_lgb_list, axis=0)
+    oof_preds_xgb = np.mean(oof_preds_xgb_list, axis=0)
     oof_preds = 0.3 * oof_preds_lgb + 0.25 * oof_preds_xgb + 0.25 * oof_preds_cb + 0.2 * oof_preds_et
 
     # Overall CV score
