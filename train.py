@@ -124,8 +124,8 @@ LGB_PARAMS = {
     "random_state": 42,
 }
 
-BLEND_WEIGHT_CAT = 0.7
-BLEND_WEIGHT_LGB = 0.3
+BLEND_WEIGHT_CAT = 0.6
+BLEND_WEIGHT_LGB = 0.4
 
 # ---------------------------------------------------------------------------
 # Training loop
