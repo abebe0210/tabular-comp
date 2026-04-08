@@ -169,10 +169,19 @@ def main():
         cat2_model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features)
         cat2_preds = cat2_model.predict_proba(X_val)[:, 1]
 
-        # LightGBM
+        # LightGBM (gbdt)
         lgb_model = lgb.LGBMClassifier(**LGB_PARAMS)
         lgb_model.fit(X_train_lgb, y_train, eval_set=[(X_val_lgb, y_val)], callbacks=[lgb.early_stopping(50, verbose=False)])
         lgb_preds = lgb_model.predict_proba(X_val_lgb)[:, 1]
+
+        # 2nd LightGBM with GOSS boosting (gradient-based one-side sampling)
+        # as a structurally different tree booster.
+        lgb2_params = {**LGB_PARAMS, "boosting_type": "goss"}
+        # GOSS does not support subsample; pop it to avoid the warning.
+        lgb2_params.pop("subsample", None)
+        lgb2_model = lgb.LGBMClassifier(**lgb2_params)
+        lgb2_model.fit(X_train_lgb, y_train, eval_set=[(X_val_lgb, y_val)], callbacks=[lgb.early_stopping(50, verbose=False)])
+        lgb2_preds = lgb2_model.predict_proba(X_val_lgb)[:, 1]
 
         # HistGradientBoosting
         from sklearn.ensemble import HistGradientBoostingClassifier
@@ -201,9 +210,10 @@ def main():
         def _grank(p):
             return norm.ppf((rankdata(p) - 0.5) / n)
         val_preds = (
-            _grank(cat_preds) + _grank(cat2_preds) + _grank(lgb_preds)
+            _grank(cat_preds) + _grank(cat2_preds)
+            + _grank(lgb_preds) + _grank(lgb2_preds)
             + _grank(hgb_preds) + _grank(lr_preds)
-        ) / 5.0
+        ) / 6.0
         oof_preds[val_idx] = val_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
