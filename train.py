@@ -168,8 +168,14 @@ def main():
         lgb_model.fit(X_train_lgb, y_train, eval_set=[(X_val_lgb, y_val)], callbacks=[lgb.early_stopping(50, verbose=False)])
         lgb_preds = lgb_model.predict_proba(X_val_lgb)[:, 1]
 
-        # Blend
-        val_preds = BLEND_WEIGHT_CAT * cat_preds + BLEND_WEIGHT_LGB * lgb_preds
+        # Blend: rank-average of the two model probabilities.
+        # Keeps the 0.6/0.4 weighting but on ranks rather than raw probabilities,
+        # which is scale-invariant and often steadier than weighted probability
+        # averaging for small datasets.
+        from scipy.stats import rankdata
+        cat_rank = rankdata(cat_preds) / len(cat_preds)
+        lgb_rank = rankdata(lgb_preds) / len(lgb_preds)
+        val_preds = BLEND_WEIGHT_CAT * cat_rank + BLEND_WEIGHT_LGB * lgb_rank
         oof_preds[val_idx] = val_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
