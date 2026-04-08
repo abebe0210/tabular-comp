@@ -29,8 +29,15 @@ def create_features(df, feature_cols):
     if "customer_id" in X.columns:
         X = X.drop(columns=["customer_id"])
 
+    # Clip outlier birth years (unrealistic ages)
+    X["birth_year"] = X["birth_year"].clip(lower=1940, upper=2005)
+
     # Age from birth_year
     X["age"] = 2024 - X["birth_year"]
+
+    # Clip extreme income outliers (beyond 99th percentile)
+    income_99 = X["annual_income"].quantile(0.99)
+    X["annual_income"] = X["annual_income"].clip(upper=income_99)
 
     # Total spending and purchases
     X["total_spend"] = X[SPEND_COLS].sum(axis=1)
