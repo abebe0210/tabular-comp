@@ -20,6 +20,17 @@ from prepare import load_data, get_cv_splits, evaluate
 def create_features(df, feature_cols):
     """Create features from raw data. Returns (X, feature_names)."""
     X = df[feature_cols].copy()
+
+    # Drop ID column
+    if "customer_id" in X.columns:
+        X = X.drop(columns=["customer_id"])
+
+    # Label encode string columns
+    from sklearn.preprocessing import LabelEncoder
+    for col in X.select_dtypes(include=["object"]).columns:
+        le = LabelEncoder()
+        X[col] = le.fit_transform(X[col].astype(str))
+
     feature_names = list(X.columns)
     return X, feature_names
 
