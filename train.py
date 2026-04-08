@@ -169,6 +169,12 @@ def main():
         cat2_model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features)
         cat2_preds = cat2_model.predict_proba(X_val)[:, 1]
 
+        # 3rd CatBoost with Lossguide grow policy (non-symmetric trees).
+        cat3_params = {**CAT_PARAMS, "grow_policy": "Lossguide"}
+        cat3_model = CatBoostClassifier(**cat3_params)
+        cat3_model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features)
+        cat3_preds = cat3_model.predict_proba(X_val)[:, 1]
+
         # LightGBM (gbdt)
         lgb_model = lgb.LGBMClassifier(**LGB_PARAMS)
         lgb_model.fit(X_train_lgb, y_train, eval_set=[(X_val_lgb, y_val)], callbacks=[lgb.early_stopping(50, verbose=False)])
@@ -210,10 +216,10 @@ def main():
         def _grank(p):
             return norm.ppf((rankdata(p) - 0.5) / n)
         val_preds = (
-            _grank(cat_preds) + _grank(cat2_preds)
+            _grank(cat_preds) + _grank(cat2_preds) + _grank(cat3_preds)
             + _grank(lgb_preds) + _grank(lgb2_preds)
             + _grank(hgb_preds) + _grank(lr_preds)
-        ) / 6.0
+        ) / 7.0
         oof_preds[val_idx] = val_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
