@@ -9,7 +9,7 @@ Usage: uv run train.py
 import time
 import numpy as np
 import pandas as pd
-import lightgbm as lgb
+from catboost import CatBoostClassifier
 
 from prepare import load_data, get_cv_splits, evaluate
 
@@ -59,17 +59,16 @@ def create_features(df, feature_cols):
     X["days_since_reg"] = (ref_date - X["reg_date"]).dt.days
     X = X.drop(columns=["registration_date", "reg_date"])
 
-    # Label encode remaining string columns
-    from sklearn.preprocessing import LabelEncoder
-    for col in X.select_dtypes(include=["object"]).columns:
-        le = LabelEncoder()
-        X[col] = le.fit_transform(X[col].astype(str))
+    # Convert string columns to category type for CatBoost
+    cat_cols = list(X.select_dtypes(include=["object"]).columns)
+    for col in cat_cols:
+        X[col] = X[col].astype(str).astype("category")
 
-    # Frequency encoding for categorical columns
+    # Frequency encoding for categorical columns (numeric version)
     for col in ["education_level", "marital_status"]:
         if col in X.columns:
             freq = X[col].value_counts(normalize=True)
-            X[f"{col}_freq"] = X[col].map(freq)
+            X[f"{col}_freq"] = X[col].map(freq).astype(float)
 
     # Missing income flag
     X["income_missing"] = X["annual_income"].isna().astype(int)
@@ -93,17 +92,15 @@ def create_features(df, feature_cols):
 # Model definition (modify freely)
 # ---------------------------------------------------------------------------
 
-LGB_PARAMS = {
-    "objective": "binary",
-    "metric": "auc",
-    "verbosity": -1,
-    "n_estimators": 1000,
+CAT_PARAMS = {
+    "iterations": 1000,
     "learning_rate": 0.05,
-    "num_leaves": 31,
-    "min_child_samples": 20,
-    "subsample": 0.8,
-    "colsample_bytree": 0.8,
-    "random_state": 42,
+    "depth": 6,
+    "l2_leaf_reg": 3,
+    "random_seed": 42,
+    "verbose": 0,
+    "eval_metric": "AUC",
+    "early_stopping_rounds": 50,
 }
 
 # ---------------------------------------------------------------------------
@@ -125,15 +122,18 @@ def main():
     oof_preds = np.zeros(len(y))
     fold_scores = []
 
+    # Identify categorical feature indices
+    cat_features = [i for i, col in enumerate(X.columns) if X[col].dtype.name == "category"]
+
     for fold_idx, (train_idx, val_idx) in enumerate(splits):
         X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        model = lgb.LGBMClassifier(**LGB_PARAMS)
+        model = CatBoostClassifier(**CAT_PARAMS)
         model.fit(
             X_train, y_train,
-            eval_set=[(X_val, y_val)],
-            callbacks=[lgb.early_stopping(50, verbose=False)],
+            eval_set=(X_val, y_val),
+            cat_features=cat_features,
         )
 
         val_preds = model.predict_proba(X_val)[:, 1]
