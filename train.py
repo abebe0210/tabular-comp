@@ -30,8 +30,8 @@ def create_features(df, feature_cols):
     if "customer_id" in X.columns:
         X = X.drop(columns=["customer_id"])
 
-    # Clip outlier birth years (unrealistic ages)
-    X["birth_year"] = X["birth_year"].clip(lower=1940, upper=2005)
+    # Clip outlier birth years (only truly unrealistic ages)
+    X["birth_year"] = X["birth_year"].clip(lower=1930, upper=2010)
 
     # Age from birth_year
     X["age"] = 2024 - X["birth_year"]
