@@ -158,10 +158,16 @@ def main():
         X_train_lgb, X_val_lgb = X_lgb.iloc[train_idx], X_lgb.iloc[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        # CatBoost
+        # CatBoost (default Bayesian bootstrap)
         cat_model = CatBoostClassifier(**CAT_PARAMS)
         cat_model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features)
         cat_preds = cat_model.predict_proba(X_val)[:, 1]
+
+        # 2nd CatBoost with Bernoulli bootstrap (structural diversity).
+        cat2_params = {**CAT_PARAMS, "bootstrap_type": "Bernoulli", "subsample": 0.8}
+        cat2_model = CatBoostClassifier(**cat2_params)
+        cat2_model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features)
+        cat2_preds = cat2_model.predict_proba(X_val)[:, 1]
 
         # LightGBM
         lgb_model = lgb.LGBMClassifier(**LGB_PARAMS)
@@ -194,7 +200,10 @@ def main():
         n = len(cat_preds)
         def _grank(p):
             return norm.ppf((rankdata(p) - 0.5) / n)
-        val_preds = (_grank(cat_preds) + _grank(lgb_preds) + _grank(hgb_preds) + _grank(lr_preds)) / 4.0
+        val_preds = (
+            _grank(cat_preds) + _grank(cat2_preds) + _grank(lgb_preds)
+            + _grank(hgb_preds) + _grank(lr_preds)
+        ) / 5.0
         oof_preds[val_idx] = val_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
