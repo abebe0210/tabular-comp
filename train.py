@@ -168,15 +168,33 @@ def main():
         lgb_model.fit(X_train_lgb, y_train, eval_set=[(X_val_lgb, y_val)], callbacks=[lgb.early_stopping(50, verbose=False)])
         lgb_preds = lgb_model.predict_proba(X_val_lgb)[:, 1]
 
-        # Blend: Gaussian rank transform then weighted average. Mapping ranks
-        # through norm.ppf spreads the tails out nonlinearly, which makes the
-        # blended score more sensitive to confident predictions from either
-        # model while preserving the 0.6/0.4 weighting.
+        # HistGradientBoosting
+        from sklearn.ensemble import HistGradientBoostingClassifier
+        hgb_model = HistGradientBoostingClassifier(random_state=42)
+        hgb_model.fit(X_train_lgb, y_train)
+        hgb_preds = hgb_model.predict_proba(X_val_lgb)[:, 1]
+
+        # LogisticRegression on scaled numeric features
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.preprocessing import StandardScaler
+        X_lr_train = X_train_lgb.replace(-999, np.nan)
+        X_lr_val = X_val_lgb.replace(-999, np.nan)
+        col_means = X_lr_train.mean(numeric_only=True)
+        X_lr_train = X_lr_train.fillna(col_means).astype(float).values
+        X_lr_val = X_lr_val.fillna(col_means).astype(float).values
+        scaler = StandardScaler()
+        X_lr_train = scaler.fit_transform(X_lr_train)
+        X_lr_val = scaler.transform(X_lr_val)
+        lr_model = LogisticRegression(max_iter=2000, solver="lbfgs")
+        lr_model.fit(X_lr_train, y_train)
+        lr_preds = lr_model.predict_proba(X_lr_val)[:, 1]
+
+        # 4-model Gaussian rank blend (equal weights).
         from scipy.stats import rankdata, norm
         n = len(cat_preds)
-        cat_g = norm.ppf((rankdata(cat_preds) - 0.5) / n)
-        lgb_g = norm.ppf((rankdata(lgb_preds) - 0.5) / n)
-        val_preds = BLEND_WEIGHT_CAT * cat_g + BLEND_WEIGHT_LGB * lgb_g
+        def _grank(p):
+            return norm.ppf((rankdata(p) - 0.5) / n)
+        val_preds = (_grank(cat_preds) + _grank(lgb_preds) + _grank(hgb_preds) + _grank(lr_preds)) / 4.0
         oof_preds[val_idx] = val_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
