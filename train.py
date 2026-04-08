@@ -65,6 +65,24 @@ def create_features(df, feature_cols):
         le = LabelEncoder()
         X[col] = le.fit_transform(X[col].astype(str))
 
+    # Frequency encoding for categorical columns
+    for col in ["education_level", "marital_status"]:
+        if col in X.columns:
+            freq = X[col].value_counts(normalize=True)
+            X[f"{col}_freq"] = X[col].map(freq)
+
+    # Missing income flag
+    X["income_missing"] = X["annual_income"].isna().astype(int)
+
+    # Log income (skewed)
+    X["log_income"] = np.log1p(X["annual_income"].fillna(0))
+
+    # Log total spend
+    X["log_total_spend"] = np.log1p(X["total_spend"])
+
+    # Has children flag
+    X["has_children"] = (X["num_children"] + X["num_teenagers"] > 0).astype(int)
+
     # Fill NaN
     X = X.fillna(-999)
 
