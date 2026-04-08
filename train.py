@@ -30,10 +30,7 @@ def create_features(df, feature_cols):
     if "customer_id" in X.columns:
         X = X.drop(columns=["customer_id"])
 
-    # Clip outlier birth years (only truly unrealistic ages)
-    X["birth_year"] = X["birth_year"].clip(lower=1930, upper=2010)
-
-    # Age from birth_year
+    # Age from birth_year (no clipping - let model handle outliers)
     X["age"] = 2024 - X["birth_year"]
 
     # Clip extreme income outliers (beyond 99th percentile)
