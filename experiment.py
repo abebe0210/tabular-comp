@@ -92,6 +92,36 @@ def commit_exists(rev: str) -> bool:
     return run_cmd(["git", "rev-parse", "--verify", "--quiet", rev], check=False).returncode == 0
 
 
+def has_remote(name: str) -> bool:
+    return run_cmd(["git", "remote", "get-url", name], check=False).returncode == 0
+
+
+def has_upstream(branch: str) -> bool:
+    return run_cmd(
+        ["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", f"{branch}@{{upstream}}"],
+        check=False,
+    ).returncode == 0
+
+
+def auto_push_current_branch() -> str | None:
+    branch = current_branch()
+    if not branch.startswith("exp/"):
+        return None
+
+    if has_upstream(branch):
+        push_args = ["git", "push"]
+    elif has_remote("origin"):
+        push_args = ["git", "push", "-u", "origin", branch]
+    else:
+        return f"warning: auto-push skipped for {branch}: remote 'origin' is not configured."
+
+    result = run_cmd(push_args, check=False)
+    if result.returncode != 0:
+        detail = result.stderr.strip() or result.stdout.strip() or "unknown git push error"
+        return f"warning: auto-push failed for {branch}: {detail}"
+    return f"auto-pushed {branch}"
+
+
 def ensure_clean_tracked(action: str) -> None:
     if tracked_dirty():
         files = "\n".join(dirty_tracked_files())
@@ -286,7 +316,10 @@ def run_experiment(description: str) -> None:
                 best=result,
             )
         )
+        push_message = auto_push_current_branch()
         print(f"keep {short_commit}: val_auc={val_auc:.6f} elapsed={elapsed_sec:.1f}s")
+        if push_message:
+            print(push_message)
         return
 
     update_state(

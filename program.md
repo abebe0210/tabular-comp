@@ -36,6 +36,7 @@ uv run python experiment.py record-last --description "completed run description
 ```
 
 `experiment.py` は `run.log` の生成、`val_auc` / `elapsed_seconds` の解析、`results.tsv` への追記、改善/悪化判定、悪化時の安全な `git reset --hard HEAD~1` を担当する。セッションが途中で切れた場合は、まず `status` を実行して推奨アクションに従う。
+`exp/<tag>` ブランチで `run` が `keep` になった場合は、そのコミットを自動で remote に push する。push に失敗しても warning を出してループは継続する。
 
 **変更できること:**
 - `train.py` のみ。特徴量エンジニアリング、モデル選択、アンサンブル、前処理、後処理 — 全て自由。
@@ -119,7 +120,7 @@ LOOP FOREVER:
 3. `git add train.py && git commit -m "expN: description"`
 4. 実験実行と記録: `uv run python experiment.py run --description "description"`
 5. `experiment.py` が `run.log` を解析し、`results.tsv` に記録する
-6. val_auc が改善（高くなった）→ `keep` としてブランチを進める
+6. val_auc が改善（高くなった）→ `keep` としてブランチを進め、自動で remote に push する
 7. val_auc が同等以下またはクラッシュ → `discard` / `crash` として記録後、安全条件を満たす場合だけ直前の実験コミットを `git reset --hard HEAD~1` で取り消す
 8. 次の実験へ
 

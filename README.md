@@ -69,12 +69,13 @@ LOOP FOREVER:
   3. train.py を編集
   4. git commit
   5. uv run python experiment.py run --description "実験内容"
-  6. 改善 → keep（ブランチを進める）
+  6. 改善 → keep（ブランチを進め、自動で remote に push）
      悪化 → discard（git reset で戻す）
   7. 次の実験へ
 ```
 
 セッションが途中で切れた場合も、`uv run python experiment.py status` で現在のブランチ、ベストスコア、未記録の `run.log`、次に実行すべき再開アクションを確認できる。
+`exp/<tag>` ブランチで `keep` になった実験コミットは自動で push されるため、別の clone でもブランチの続きから再開しやすい。
 
 寝ている間に放置すれば、朝起きたときに数十件の実験結果と改善されたモデルが手に入る。
 
@@ -184,7 +185,7 @@ git commit -m "expN: description"
 uv run python experiment.py run --description "description"
 ```
 
-`experiment.py` は tracked file に未コミット差分がある場合は実行や再開を拒否する。悪化またはクラッシュした実験は `results.tsv` に記録した後、HEAD が対象コミットのままで tracked tree が clean の場合だけ `git reset --hard HEAD~1` で破棄する。
+`experiment.py` は tracked file に未コミット差分がある場合は実行や再開を拒否する。`exp/<tag>` ブランチで `run` が `keep` になった場合は、そのコミットを自動で push する。悪化またはクラッシュした実験は `results.tsv` に記録した後、HEAD が対象コミットのままで tracked tree が clean の場合だけ `git reset --hard HEAD~1` で破棄する。auto-push が失敗しても warning を出すだけで実験結果自体は保持される。
 
 ## カスタマイズ
 
@@ -214,7 +215,7 @@ def evaluate(y_true, y_pred):
 - **単一ファイル編集**: エージェントは `train.py` だけを触る。スコープが明確で、差分がレビューしやすい。
 - **固定評価**: `prepare.py` の評価関数は不変。実験間の比較が常に公平。
 - **自己完結**: 外部サービスや複雑な設定は不要。1ファイル、1メトリック。
-- **Git駆動**: 各実験がコミット単位。改善は保持、失敗は破棄。履歴と `results.tsv` が実験ログになる。
+- **Git駆動**: 各実験がコミット単位。改善は保持、失敗は破棄。`keep` は自動 push され、履歴と `results.tsv` が実験ログになる。
 - **再開可能**: `experiment.py status` で中断後の状態を診断し、`resume` / `record-last` / `run` のどれで続けるべきか確認できる。
 
 ## ライセンス
