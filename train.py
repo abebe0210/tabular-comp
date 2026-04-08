@@ -9,6 +9,7 @@ Usage: uv run train.py
 import time
 import numpy as np
 import pandas as pd
+import lightgbm as lgb
 from catboost import CatBoostClassifier
 
 from prepare import load_data, get_cv_splits, evaluate
@@ -110,6 +111,22 @@ CAT_PARAMS = {
     "early_stopping_rounds": 50,
 }
 
+LGB_PARAMS = {
+    "objective": "binary",
+    "metric": "auc",
+    "verbosity": -1,
+    "n_estimators": 1000,
+    "learning_rate": 0.05,
+    "num_leaves": 31,
+    "min_child_samples": 20,
+    "subsample": 0.8,
+    "colsample_bytree": 0.8,
+    "random_state": 42,
+}
+
+BLEND_WEIGHT_CAT = 0.7
+BLEND_WEIGHT_LGB = 0.3
+
 # ---------------------------------------------------------------------------
 # Training loop
 # ---------------------------------------------------------------------------
@@ -129,21 +146,33 @@ def main():
     oof_preds = np.zeros(len(y))
     fold_scores = []
 
-    # Identify categorical feature indices
+    # Identify categorical feature indices for CatBoost
     cat_features = [i for i, col in enumerate(X.columns) if X[col].dtype.name == "category"]
+
+    # Prepare LGB-compatible data (label encode categoricals)
+    from sklearn.preprocessing import LabelEncoder
+    X_lgb = X.copy()
+    for col in X_lgb.select_dtypes(include=["category"]).columns:
+        le = LabelEncoder()
+        X_lgb[col] = le.fit_transform(X_lgb[col].astype(str))
 
     for fold_idx, (train_idx, val_idx) in enumerate(splits):
         X_train, X_val = X.iloc[train_idx], X.iloc[val_idx]
+        X_train_lgb, X_val_lgb = X_lgb.iloc[train_idx], X_lgb.iloc[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        model = CatBoostClassifier(**CAT_PARAMS)
-        model.fit(
-            X_train, y_train,
-            eval_set=(X_val, y_val),
-            cat_features=cat_features,
-        )
+        # CatBoost
+        cat_model = CatBoostClassifier(**CAT_PARAMS)
+        cat_model.fit(X_train, y_train, eval_set=(X_val, y_val), cat_features=cat_features)
+        cat_preds = cat_model.predict_proba(X_val)[:, 1]
 
-        val_preds = model.predict_proba(X_val)[:, 1]
+        # LightGBM
+        lgb_model = lgb.LGBMClassifier(**LGB_PARAMS)
+        lgb_model.fit(X_train_lgb, y_train, eval_set=[(X_val_lgb, y_val)], callbacks=[lgb.early_stopping(50, verbose=False)])
+        lgb_preds = lgb_model.predict_proba(X_val_lgb)[:, 1]
+
+        # Blend
+        val_preds = BLEND_WEIGHT_CAT * cat_preds + BLEND_WEIGHT_LGB * lgb_preds
         oof_preds[val_idx] = val_preds
         fold_auc = evaluate(y_val, val_preds)
         fold_scores.append(fold_auc)
