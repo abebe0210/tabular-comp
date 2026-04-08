@@ -1,10 +1,83 @@
-# Experiment Log: gci-compe-test-opu
+# Experiment Log: gci-compe-test-opus
 
-- **run tag**: `gci-compe-test-opu`
-- **branch**: `exp/gci-compe-test-opu`
-- **date**: 2026-04-08
-- **best HEAD**: `20c9e77` (val_auc = **0.894016**)
-- **total experiments**: 33 (1 crash, 8 keep, 24 discard)
+- **run tag**: `gci-compe-test-opus` (renamed from `gci-compe-test-opu` in session 2)
+- **branch**: `exp/gci-compe-test-opus`
+- **date**: 2026-04-08 (session 1 + session 2 resume)
+- **best HEAD (session 2)**: `88897bb` (val_auc = **0.904037**)
+- **best HEAD (session 1)**: `20c9e77` (val_auc = 0.894016)
+- **total experiments**: session 1 = 33, session 2 = 26 (5 keep, 21 discard)
+- **session 2 net improvement**: +0.010 (0.894016 → 0.904037)
+
+## Session 2 summary (exp34–exp59)
+
+Starting from exp29 (0.894016 = CatBoost+LightGBM 0.6/0.4 probability blend),
+session 2 found that **rank-based blending and model diversity** are the main
+remaining source of gains.
+
+### Session 2 keepers (in order)
+
+| exp | commit | val_auc | Δ | change |
+|-----|--------|---------|---|--------|
+| 35 | 260ef85 | 0.902052 | +0.008 | **rank-average blend** (replace weighted probability average with rank/len average) |
+| 46 | c11313c | 0.902094 | +0.00004 | Gaussian rank transform (`norm.ppf` of percentile) before blending |
+| 47 | 7276461 | 0.903031 | +0.001 | 4-model equal gaussian-rank blend: CatBoost + LGB + sklearn HGB + LogisticRegression |
+| 56 | 321c106 | 0.903316 | +0.0003 | add 2nd CatBoost with `bootstrap_type="Bernoulli"` (5-model) |
+| 57 | 88897bb | 0.904037 | +0.0007 | add 2nd LGB with `boosting_type="goss"` (6-model) |
+
+### Session 2 discards — what did NOT work on top of the rank-blend baseline
+
+Feature engineering (all discarded):
+- exp34 fold-safe target encoding (edu/marital) — 0.890841, also exp41 on rank-blend = 0.898230
+- exp36 PCA(2) spend + PCA(1) purchases — 0.899304
+- exp37 NaN pattern categorical + na_count — 0.900905 (exp42 na_count only = 0.899734)
+- exp38 sqrt(total_spend), sqrt(annual_income) — 0.898075
+- exp45 drop bottom 20% LGB importance features — 0.901030
+
+Blend/model composition changes:
+- exp39 3-model: +HGB — 0.901253
+- exp40 3-model: +ExtraTrees — 0.896893 (ET noisy on this data)
+- exp43 3-model: +DART LGB — 0.900191
+- exp44 3-model: +LogisticRegression — 0.901658 (strong solo but 4-model wins)
+- exp49 5-model: +ExtraTrees — 0.901387
+- exp50 5-model: +XGBoost — 0.902829
+- exp51 5-model: +GaussianNB — 0.894663 (NB far too noisy)
+- exp53 6-model: +XGBoost+DARTLGB — 0.901855
+- exp54 3-model: drop HGB from 4-model — 0.902491 (HGB does contribute)
+- exp55 5-model: +MLPClassifier(64,32) — 0.898696
+- exp58 7-model: +XGBoost on top of 6-model — 0.903646
+- exp59 7-model: +sklearn GradientBoostingClassifier — 0.902906
+
+Model tweaks:
+- exp48 CatBoost `auto_class_weights="Balanced"` — 0.902792
+- exp52 LightGBM `objective="cross_entropy"` — 0.903031 (tie, not strictly greater so discarded)
+
+### Key takeaways for session 3
+
+1. **AUC is rank-sensitive.** The huge exp35 jump (+0.008) came purely from
+   switching `w1*p1 + w2*p2` to rank-based averaging. Any future blend changes
+   should stay in rank space.
+2. **Structural diversity helps; generic model spam does not.** Adding a model
+   with a genuinely different inductive bias (LogisticRegression, alternative
+   CatBoost bootstrap, GOSS LGB) helped. Adding another similar tree booster
+   (XGBoost, sklearn GBC, DART) did not.
+3. **The 6-model blend is at or near a local max.** 7-model variants were all
+   slightly worse, suggesting blend saturation, not an n_models hyperparameter
+   to keep growing.
+4. **Feature engineering plateau is real.** Nothing added to `train.py`'s
+   feature set improved on the rank-blend baseline. Previous session already
+   noted this on the pre-blend baseline, and it still holds.
+5. **LogisticRegression is the weakest individual model but still lifts the
+   blend** — its errors are decorrelated from the trees.
+
+### Session 3 hints
+
+- Combine rank-blend with structural CatBoost changes (e.g. `grow_policy`)
+- Fold-wise stacking of the 6 OOFs with a *very simple* meta-learner (risky —
+  prior stacking attempt failed)
+- Calibration-aware blending (e.g. sign-invariant rank-corrected weighting)
+- `experiment.py` has a cosmetic crash at the end of discarded runs (Windows
+  subprocess `stdout=None` case in `run_cmd`) — results and reset still work,
+  but fixing it would clean up the logs.
 
 ---
 
