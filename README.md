@@ -165,10 +165,10 @@ uv run python experiment.py status
 既存の実験ブランチへ戻る:
 
 ```bash
-uv run python experiment.py resume --branch exp/<tag>
+uv run python experiment.py resume --branch exp/<project-tag>
 ```
 
-`<tag>` は `uv run python experiment.py status` の `experiment_branches` と `recommended_action` を見て選ぶ。`status` はローカルの Git ブランチ一覧、`results.tsv` のベスト `keep` 行、現在の `run.log` のスコア、現在の `HEAD` が記録済みかどうかを参照して再開方法を案内する。
+`<project-tag>` はプロジェクト名やコンペ名に合わせて任意に決める。`status` はローカルの Git ブランチ一覧、`results.tsv` のベスト `keep` 行、現在の `run.log` のスコア、現在の `HEAD` が記録済みかどうかを参照して再開方法を案内する。
 
 `run.log` に完了済みの結果が残っていて、現在の `HEAD` がまだ `results.tsv` に記録されていない場合だけ、再実行せずに記録する:
 
